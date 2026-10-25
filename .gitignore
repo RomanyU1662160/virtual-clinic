@@ -43,3 +43,11 @@ Thumbs.db
 .nx/migrate-runs
 .claude/worktrees
 .claude/settings.local.json
+
+
+# Local-only notes and secrets
+.local/
+*.local.md
+.env*
+!.env.example
+test-output
