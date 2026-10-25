@@ -1,0 +1,26 @@
+assert_lefthook_installed: true
+output: [summary, failure, execution_out]
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: '*.{ts,js,mjs,cjs,json,md,yml,yaml}'
+      run: pnpm prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+    lint:
+      glob: '*.{ts,js,mjs,cjs}'
+      run: pnpm eslint --no-warn-ignored {staged_files}
+    no-spec-files:
+      glob: '*.spec.ts'
+      run: 'echo "Rename to *.test.ts: {staged_files}" && exit 1'
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}
+
+pre-push:
+  commands:
+    affected:
+      run: pnpm nx affected -t lint test --base=origin/main

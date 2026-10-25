@@ -2,9 +2,17 @@
   "name": "@vclinic/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "format": "nx format:write",
+    "format:check": "nx format:check",
+    "lint": "nx run-many -t lint",
+    "test": "nx run-many -t test",
+    "prepare": "lefthook install"
+  },
   "private": true,
   "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
     "@eslint/js": "^9.8.0",
     "@nx/eslint": "24.0.1",
     "@nx/eslint-plugin": "24.0.1",
@@ -21,6 +29,7 @@
     "jest-environment-node": "~30.3.0",
     "jest-util": "~30.3.0",
     "jsonc-eslint-parser": "^2.1.0",
+    "lefthook": "^2.2.2",
     "nx": "24.0.1",
     "prettier": "~3.6.2",
     "ts-jest": "^29.4.7",
@@ -29,5 +38,8 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.58.0"
   },
-  "packageManager": "pnpm@10.17.1"
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": ">=24 <25"
+  }
 }
