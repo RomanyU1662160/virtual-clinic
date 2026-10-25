@@ -1,5 +1,14 @@
 assert_lefthook_installed: true
-output: [summary, failure, execution_out]
+output:
+  [
+    summary,
+    failure,
+    execution_out,
+    success,
+    execution_info,
+    execution_err,
+    skips,
+  ]
 
 pre-commit:
   parallel: true
