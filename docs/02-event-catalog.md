@@ -1,6 +1,9 @@
 # 02 — Event Catalog
 
-> Status: Agreed v2 · 2026-10-26
+> Status: Agreed v3 · 2026-10-29 (v3: aligned with `@vclinic/contracts`; snapshot updates, no secrets, fixed formats)
+>
+> **Source of truth:** the Zod schemas in `packages/contracts/src/events/`. This document and the code change in
+> the same commit.
 
 ## Conventions
 
@@ -9,7 +12,16 @@
 - **Envelope:** every event is wrapped in `{ metadata, data }`. `metadata` holds `eventId`, `eventType`,
   `eventVersion`, `occurredAt`, `correlationId` and `causationId`, so those never repeat inside `data`.
 - **Minimal data:** a field is included only if a listed consumer needs it.
-- **Times:** ISO-8601 UTC strings (`2026-10-25T10:00:00Z`).
+- **Times:** ISO-8601 UTC strings ending in `Z` (`2026-10-25T10:00:00Z`); offsets are rejected. Compare times as
+  instants (`Date.parse`), never as strings: `10:00:00.500Z` sorts _before_ `10:00:00Z` as text.
+- **No duplicate timestamps:** no `createdAt` / `cancelledAt` etc. in `data`; `metadata.occurredAt` is the time.
+- **Formats:** ids are UUIDs, phones are E.164 (`+447700900123`), required text is non-empty.
+- **Update events are full snapshots:** `*.updated` carries the complete current profile plus `changedFields[]`
+  (which fields changed). Consumers replace their copy instead of merging partial data, and "phone removed" is
+  distinguishable from "phone unchanged".
+- **Never publish secrets** (e.g. partner access codes) or **free-text provider errors** (they can echo addresses).
+- **Rules enforced in the schema:** `endTime` > `startTime` on appointments and slots; arrays such as `slots[]` and
+  `changedFields[]` are never empty.
 
 ## Bounded contexts (services)
 
@@ -32,37 +44,41 @@
 
 ### Membership
 
-| Event type                      | Consumers            | `data` fields                                                                       | Personal data? |
-| ------------------------------- | -------------------- | ----------------------------------------------------------------------------------- | -------------- |
-| `membership.partner.registered` | Audit                | `partnerId`, `name`, `eligibilityType` (`accessCode` \| `emailDomain`)              | No             |
-| `membership.member.invited`     | Notifications, Audit | `memberId`, `partnerId`, `email`, `firstName`                                       | Yes            |
-| `membership.member.activated`   | Notifications, Audit | `memberId`, `partnerId`, `email`, `phone?`, `title?`, `firstName`, `lastName`       | Yes            |
-| `membership.member.updated`     | Notifications, Audit | `memberId`, `changedFields[]`, `email`, `phone?`, `title?`, `firstName`, `lastName` | Yes            |
+| Event type                      | Consumers            | `data` fields                                                                                                   | Personal data? |
+| ------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------- | -------------- |
+| `membership.partner.registered` | Audit                | `partnerId`, `name`, `eligibilityType` (`accessCode` \| `emailDomain`), `emailDomain` (only when `emailDomain`) | No             |
+| `membership.member.invited`     | Notifications, Audit | `memberId`, `partnerId`, `email`, `firstName`                                                                   | Yes            |
+| `membership.member.activated`   | Notifications, Audit | `memberId`, `partnerId`, `email`, `phone?`, `title?`, `firstName`, `lastName`                                   | Yes            |
+| `membership.member.updated`     | Notifications, Audit | same as `activated` + `changedFields[]` (any profile field except the ids)                                      | Yes            |
 
 ### Care Team
 
-| Event type                      | Consumers                     | `data` fields                                                                    | Personal data?     |
-| ------------------------------- | ----------------------------- | -------------------------------------------------------------------------------- | ------------------ |
-| `careteam.clinician.registered` | Booking, Notifications, Audit | `clinicianId`, `title?`, `firstName`, `lastName`, `specialty`, `email`, `phone?` | Yes (professional) |
-| `careteam.clinician.updated`    | Booking, Notifications, Audit | `clinicianId`, `changedFields[]`, then the same fields as `registered`           | Yes (professional) |
+| Event type                      | Consumers                     | `data` fields                                                                     | Personal data?     |
+| ------------------------------- | ----------------------------- | --------------------------------------------------------------------------------- | ------------------ |
+| `careteam.clinician.registered` | Booking, Notifications, Audit | `clinicianId`, `title?`, `firstName`, `lastName`, `specialty`, `email`, `phone?`  | Yes (professional) |
+| `careteam.clinician.updated`    | Booking, Notifications, Audit | same as `registered` + `changedFields[]` (any profile field except `clinicianId`) | Yes (professional) |
 
 ### Booking
 
-| Event type                        | Consumers            | `data` fields                                                                                                                        | Personal data? |
-| --------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
-| `booking.slot.published`          | Audit                | `clinicianId`, `slots[] { slotId, startTime, endTime }`                                                                              | No             |
-| `booking.slot.withdrawn`          | Audit                | `clinicianId`, `slotIds[]`                                                                                                           | No             |
-| `booking.appointment.booked`      | Notifications, Audit | `appointmentId`, `memberId`, `clinicianId`, `slotId`, `startTime`, `endTime`                                                         | Yes (health)   |
-| `booking.appointment.cancelled`   | Notifications, Audit | `appointmentId`, `memberId`, `clinicianId`, `slotId`, `startTime`, `cancelledBy` (`member` \| `clinician` \| `system`), `reason?`    | Yes (health)   |
-| `booking.appointment.rescheduled` | Notifications, Audit | `appointmentId`, `memberId`, `clinicianId`, `previousSlotId`, `previousStartTime`, `slotId`, `startTime`, `endTime`, `rescheduledBy` | Yes (health)   |
+| Event type                        | Consumers            | `data` fields                                                                                                                                                                  | Personal data? |
+| --------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| `booking.slot.published`          | Audit                | `clinicianId`, `slots[] { slotId, startTime, endTime }`                                                                                                                        | No             |
+| `booking.slot.withdrawn`          | Audit                | `clinicianId`, `slotIds[]`                                                                                                                                                     | No             |
+| `booking.appointment.booked`      | Notifications, Audit | `appointmentId`, `memberId`, `clinicianId`, `slotId`, `startTime`, `endTime`                                                                                                   | Yes (health)   |
+| `booking.appointment.cancelled`   | Notifications, Audit | `appointmentId`, `memberId`, `clinicianId`, `slotId`, `startTime`, `endTime`, `cancelledBy` (`member` \| `clinician` \| `system`), `reason?`                                   | Yes (health)   |
+| `booking.appointment.rescheduled` | Notifications, Audit | `appointmentId`, `memberId`, `clinicianId`, `previousSlotId`, `previousStartTime`, `slotId`, `startTime`, `endTime`, `rescheduledBy` (same values as `cancelledBy`), `reason?` | Yes (health)   |
 
 ### Notifications
 
 | Event type                          | Consumers | `data` fields                                                                                                                              | Personal data?                |
 | ----------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
 | `notifications.notification.sent`   | Audit     | `notificationId`, `recipientType` (`member` \| `clinician`), `recipientId`, `channel` (`email` \| `sms`), `template`, `triggeredByEventId` | Yes (low: no message content) |
-| `notifications.notification.failed` | Audit     | same as `sent` + `errorCode`                                                                                                               | Yes (low)                     |
-| `notifications.preferences.updated` | Audit     | `memberId`, `channels[]`                                                                                                                   | Yes (low)                     |
+| `notifications.notification.failed` | Audit     | same as `sent` + `errorCode` (`bounced` \| `invalid_address` \| `provider_error` \| `rate_limited`)                                        | Yes (low)                     |
+| `notifications.preferences.updated` | Audit     | `memberId`, `channels[]` (`email` \| `sms`; empty = opted out of optional messages such as reminders)                                      | Yes (low)                     |
+
+> **Open question:** `reason?` on cancel/reschedule is free text a member types, so it may contain health details
+> ("clashes with my chemo"). Options: keep it (stored encrypted, never logged) or replace it with a fixed
+> `reasonCode`. To decide before Booking is built.
 
 ## Why each consumer needs it
 
