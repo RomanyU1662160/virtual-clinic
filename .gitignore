@@ -51,3 +51,11 @@ Thumbs.db
 .env*
 !.env.example
 test-output
+
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+platform/terraform/bootstrap/terraform.tfvars
+platform/terraform/bootstrap/terraform.tfvars.json
