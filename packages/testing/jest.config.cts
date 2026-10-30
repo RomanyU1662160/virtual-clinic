@@ -1,4 +1,3 @@
-/* eslint-disable */
 const { readFileSync } = require('fs');
 
 // Reading the SWC compilation config for the spec files
@@ -13,6 +12,8 @@ module.exports = {
   displayName: '@vclinic/testing',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  // Placeholder package until test-data builders land; remove when it has tests.
+  passWithNoTests: true,
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
   },
